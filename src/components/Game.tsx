@@ -11,6 +11,7 @@ import {
   Direction,
   getRandomNumber
 } from '../utils/gameLogic';
+import { playBlopSound, playPushSound } from '../utils/sound';
 
 type GridSize = 3 | 4 | 5;
 
@@ -148,12 +149,24 @@ const Game: React.FC = () => {
         const currentCell = Math.floor((clientX - gridRect.left) / (gridRect.width / gridSize));
         // Clamp currentCell to grid boundaries
         const clampedCurrentCell = Math.max(0, Math.min(gridSize - 1, currentCell));
+        
+        // Play sound if we've moved to a new cell
+        if (swipeProgress?.current !== clampedCurrentCell) {
+          playBlopSound(clampedCurrentCell);
+        }
+        
         setSwipeProgress({ start: startCell, current: clampedCurrentCell });
       } else {
         const startCell = Math.floor((touchStart.y - gridRect.top) / (gridRect.height / gridSize));
         const currentCell = Math.floor((clientY - gridRect.top) / (gridRect.height / gridSize));
         // Clamp currentCell to grid boundaries
         const clampedCurrentCell = Math.max(0, Math.min(gridSize - 1, currentCell));
+        
+        // Play sound if we've moved to a new cell
+        if (swipeProgress?.current !== clampedCurrentCell) {
+          playBlopSound(clampedCurrentCell);
+        }
+        
         setSwipeProgress({ start: startCell, current: clampedCurrentCell });
       }
     }
@@ -194,6 +207,8 @@ const Game: React.FC = () => {
       } else {
         handlePush(targetIndex, distanceY > 0 ? 'top' : 'bottom');
       }
+      // Play push sound when the push action occurs
+      playPushSound();
     }
 
     // Reset all drag states
@@ -289,7 +304,7 @@ const Game: React.FC = () => {
         <div className="mb-12 flex items-center justify-center">
           <div className="flex items-center gap-4 min-w-[300px] justify-center">
             <div className="text-gray-600 text-xl">Spare Number:</div>
-            <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold 
+            <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold text-black
               rounded-lg shadow-lg transform transition-all duration-300
               ${spareNumber ? 'bg-blue-50' : 'bg-gray-100'}`}>
               {spareNumber ?? '?'}
