@@ -38,6 +38,12 @@ const Game: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedRowCol, setDraggedRowCol] = useState<{ row: number | null; col: number | null }>({
+    row: null,
+    col: null
+  });
+  const [swipeProgress, setSwipeProgress] = useState<{ start: number; current: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Minimum swipe distance in pixels
@@ -99,62 +105,120 @@ const Game: React.FC = () => {
     
     setTouchEnd(null);
     setTouchStart({ x: clientX, y: clientY });
-    
-    // Prevent default behavior
-    if (!('touches' in e)) {
-      e.preventDefault();
+    setIsDragging(true);
+    setSwipeProgress(null);
+
+    // Store the initial target index
+    const distanceX = 0;
+    const distanceY = 0;
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+    const initialTargetIndex = getTargetedIndex(clientX, clientY, isHorizontalSwipe);
+    if (initialTargetIndex !== null) {
+      setDraggedRowCol({
+        row: isHorizontalSwipe ? initialTargetIndex : null,
+        col: isHorizontalSwipe ? null : initialTargetIndex
+      });
     }
   };
 
   const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!touchStart) return;
+    if (!touchStart || !gridRef.current || !isDragging) return;
     
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
     setTouchEnd({ x: clientX, y: clientY });
+
+    // Calculate which row/column is being dragged
+    const distanceX = clientX - touchStart.x;
+    const distanceY = clientY - touchStart.y;
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
     
-    // Prevent default behavior
-    if (!('touches' in e)) {
-      e.preventDefault();
+    const targetIndex = getTargetedIndex(touchStart.x, touchStart.y, isHorizontalSwipe);
+    if (targetIndex !== null) {
+      setDraggedRowCol({
+        row: isHorizontalSwipe ? targetIndex : null,
+        col: isHorizontalSwipe ? null : targetIndex
+      });
+
+      // Calculate swipe progress
+      const gridRect = gridRef.current.getBoundingClientRect();
+      if (isHorizontalSwipe) {
+        const startCell = Math.floor((touchStart.x - gridRect.left) / (gridRect.width / gridSize));
+        const currentCell = Math.floor((clientX - gridRect.left) / (gridRect.width / gridSize));
+        // Clamp currentCell to grid boundaries
+        const clampedCurrentCell = Math.max(0, Math.min(gridSize - 1, currentCell));
+        setSwipeProgress({ start: startCell, current: clampedCurrentCell });
+      } else {
+        const startCell = Math.floor((touchStart.y - gridRect.top) / (gridRect.height / gridSize));
+        const currentCell = Math.floor((clientY - gridRect.top) / (gridRect.height / gridSize));
+        // Clamp currentCell to grid boundaries
+        const clampedCurrentCell = Math.max(0, Math.min(gridSize - 1, currentCell));
+        setSwipeProgress({ start: startCell, current: clampedCurrentCell });
+      }
     }
   };
 
   const handleDragEnd = (e?: React.MouseEvent | React.TouchEvent) => {
-    if (!touchStart || !touchEnd) return;
+    if (!isDragging || !touchStart || !touchEnd || !swipeProgress) {
+      // Reset all drag states if we don't have complete swipe data
+      setTouchStart(null);
+      setTouchEnd(null);
+      setIsDragging(false);
+      setDraggedRowCol({ row: null, col: null });
+      setSwipeProgress(null);
+      return;
+    }
 
-    const distanceX = touchStart.x - touchEnd.x;
-    const distanceY = touchStart.y - touchEnd.y;
+    const distanceX = touchEnd.x - touchStart.x;
+    const distanceY = touchEnd.y - touchStart.y;
     const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+    
+    // Use the stored target index from draggedRowCol instead of calculating a new one
+    const targetIndex = isHorizontalSwipe ? draggedRowCol.row : draggedRowCol.col;
+    if (targetIndex === null) {
+      // Reset all drag states if target index is invalid
+      setTouchStart(null);
+      setTouchEnd(null);
+      setIsDragging(false);
+      setDraggedRowCol({ row: null, col: null });
+      setSwipeProgress(null);
+      return;
+    }
 
-    const targetIndex = getTargetedIndex(touchStart.x, touchStart.y, isHorizontalSwipe);
-    if (targetIndex === null) return;
-
-    if (isHorizontalSwipe) {
-      if (Math.abs(distanceX) < minSwipeDistance) return;
-      if (distanceX > 0) {
-        handlePush(targetIndex, 'right');
+    // Check if all cells have been swiped
+    const swipedCells = Math.abs(swipeProgress.current - swipeProgress.start) + 1;
+    if (swipedCells >= gridSize) {
+      if (isHorizontalSwipe) {
+        handlePush(targetIndex, distanceX > 0 ? 'left' : 'right');
       } else {
-        handlePush(targetIndex, 'left');
-      }
-    } else {
-      if (Math.abs(distanceY) < minSwipeDistance) return;
-      if (distanceY > 0) {
-        handlePush(targetIndex, 'bottom');
-      } else {
-        handlePush(targetIndex, 'top');
+        handlePush(targetIndex, distanceY > 0 ? 'top' : 'bottom');
       }
     }
 
-    // Reset drag state
+    // Reset all drag states
     setTouchStart(null);
     setTouchEnd(null);
-    
-    // Prevent default behavior
-    if (e && !('touches' in e)) {
-      e.preventDefault();
-    }
+    setIsDragging(false);
+    setDraggedRowCol({ row: null, col: null });
+    setSwipeProgress(null);
   };
+
+  // Add global mouse up listener
+  useEffect(() => {
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      if (isDragging) {
+        // Update the final touch position
+        setTouchEnd({ x: e.clientX, y: e.clientY });
+        handleDragEnd();
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isDragging, touchStart, swipeProgress, draggedRowCol.row, draggedRowCol.col]);
 
   const getTargetedIndex = (x: number, y: number, isHorizontal: boolean): number | null => {
     if (!gridRef.current) return null;
@@ -227,7 +291,7 @@ const Game: React.FC = () => {
             <div className="text-gray-600 text-xl">Spare Number:</div>
             <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold 
               rounded-lg shadow-lg transform transition-all duration-300
-              ${spareNumber ? getColorForNumber(spareNumber) : 'bg-gray-100'}`}>
+              ${spareNumber ? 'bg-blue-50' : 'bg-gray-100'}`}>
               {spareNumber ?? '?'}
             </div>
             {spareNumber === null && (
@@ -253,7 +317,6 @@ const Game: React.FC = () => {
             onMouseDown={handleDragStart}
             onMouseMove={handleDragMove}
             onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
           >
             {/* Grid */}
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}>
@@ -265,7 +328,17 @@ const Game: React.FC = () => {
                   >
                     <Cell
                       value={value}
-                      isSelected={false}
+                      isSelected={isDragging && (
+                        (draggedRowCol.row === rowIndex) ||
+                        (draggedRowCol.col === colIndex)
+                      )}
+                      isSwipedOver={Boolean(
+                        swipeProgress && 
+                        ((draggedRowCol.row === rowIndex && 
+                          isBetween(colIndex, swipeProgress.start, swipeProgress.current)) ||
+                         (draggedRowCol.col === colIndex && 
+                          isBetween(rowIndex, swipeProgress.start, swipeProgress.current)))
+                      )}
                       onClick={() => {}}
                     />
                   </div>
@@ -318,6 +391,13 @@ const Game: React.FC = () => {
       )}
     </div>
   );
+};
+
+// Helper function to check if a number is between two other numbers (inclusive, order independent)
+const isBetween = (num: number, a: number, b: number) => {
+  const min = Math.min(a, b);
+  const max = Math.max(a, b);
+  return num >= min && num <= max;
 };
 
 export default Game; 
