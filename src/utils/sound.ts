@@ -56,6 +56,34 @@ export const playPushSound = () => {
   // Create oscillator and gain nodes
   const oscillator = audioContext.createOscillator();
   const gainNode = audioContext.createGain();
+
+  // Configure oscillator with a high-to-low sweep
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // Start at A5
+  oscillator.frequency.exponentialRampToValueAtTime(220, audioContext.currentTime + 0.2); // End at A3
+
+  // Configure gain (volume) with a quick fade out
+  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+  // Connect nodes
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  // Play sound
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 0.2);
+};
+
+export const playErrorSound = () => {
+  // Initialize audio context on first use (needs user interaction)
+  if (!audioContext) {
+    audioContext = new AudioContext();
+  }
+
+  // Create oscillator and gain nodes
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
   const filterNode = audioContext.createBiquadFilter();
 
   // Configure filter

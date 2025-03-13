@@ -11,7 +11,7 @@ import {
   Direction,
   getRandomNumber
 } from '../utils/gameLogic';
-import { playBlopSound, playPushSound } from '../utils/sound';
+import { playBlopSound, playPushSound, playErrorSound } from '../utils/sound';
 
 type GridSize = 3 | 4 | 5;
 
@@ -206,6 +206,8 @@ const Game: React.FC = () => {
       if (!isHorizontalSwipe) {
         // If the spare number matches the column index (0-based), prevent the push
         if (spareNumber - 1 === targetIndex) {
+          // Play error sound for forbidden move
+          playErrorSound();
           // Reset all drag states without pushing
           setTouchStart(null);
           setTouchEnd(null);
