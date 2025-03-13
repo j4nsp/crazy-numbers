@@ -379,6 +379,17 @@ const Game: React.FC = () => {
           </div>
         </div>
 
+        {hasWon && (
+          <div className="mt-8 text-center">
+            <h2 className="text-2xl font-bold text-green-600 mb-2">
+              Congratulations!
+            </h2>
+            <p className="text-gray-600 mb-4">
+              You've arranged all rows in perfect order!
+            </p>
+          </div>
+        )}
+
         <div className="mt-12">
           <button
             onClick={resetGame}
@@ -392,33 +403,13 @@ const Game: React.FC = () => {
       </div>
 
       {hasWon && (
-        <>
-          <ReactConfetti
-            width={window.innerWidth}
-            height={window.innerHeight}
-            recycle={false}
-            numberOfPieces={500}
-            gravity={0.2}
-          />
-          <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-            <div className="bg-white p-8 rounded-xl text-center transform scale-up pointer-events-auto">
-              <h2 className="text-4xl font-bold text-green-600 mb-4">
-                Congratulations!
-              </h2>
-              <p className="text-gray-600 mb-6 text-xl">
-                You've arranged all rows in perfect order!
-              </p>
-              <button
-                onClick={resetGame}
-                className="py-3 px-8 bg-green-500 text-white text-xl font-semibold 
-                  rounded-lg hover:bg-green-600 transform hover:scale-105 
-                  transition-all duration-200"
-              >
-                Play Again
-              </button>
-            </div>
-          </div>
-        </>
+        <ReactConfetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+          numberOfPieces={500}
+          gravity={0.2}
+        />
       )}
     </div>
   );
