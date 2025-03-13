@@ -173,7 +173,7 @@ const Game: React.FC = () => {
   };
 
   const handleDragEnd = (e?: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging || !touchStart || !touchEnd || !swipeProgress) {
+    if (!isDragging || !touchStart || !touchEnd || !swipeProgress || !spareNumber) {
       // Reset all drag states if we don't have complete swipe data
       setTouchStart(null);
       setTouchEnd(null);
@@ -202,6 +202,20 @@ const Game: React.FC = () => {
     // Check if all cells have been swiped
     const swipedCells = Math.abs(swipeProgress.current - swipeProgress.start) + 1;
     if (swipedCells >= gridSize) {
+      // For vertical swipes, check if we're trying to push into the matching column
+      if (!isHorizontalSwipe) {
+        // If the spare number matches the column index (0-based), prevent the push
+        if (spareNumber - 1 === targetIndex) {
+          // Reset all drag states without pushing
+          setTouchStart(null);
+          setTouchEnd(null);
+          setIsDragging(false);
+          setDraggedRowCol({ row: null, col: null });
+          setSwipeProgress(null);
+          return;
+        }
+      }
+
       if (isHorizontalSwipe) {
         handlePush(targetIndex, distanceX > 0 ? 'left' : 'right');
       } else {
