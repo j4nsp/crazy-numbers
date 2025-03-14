@@ -370,6 +370,11 @@ const Game: React.FC = () => {
                          (draggedRowCol.col === colIndex && 
                           isBetween(rowIndex, swipeProgress.start, swipeProgress.current)))
                       )}
+                      isForbidden={Boolean(
+                        spareNumber && 
+                        draggedRowCol.col === colIndex && 
+                        spareNumber - 1 === colIndex
+                      )}
                       onClick={() => {}}
                     />
                   </div>
