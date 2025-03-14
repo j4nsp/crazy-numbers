@@ -17,6 +17,7 @@ type GridSize = 3 | 4 | 5;
 
 const Game: React.FC = () => {
   const [gridSize, setGridSize] = useState<GridSize>(3);
+  const [error, setError] = useState<string | null>(null);
   
   // Initialize with empty grid to avoid hydration mismatch
   const [grid, setGrid] = useState<number[][]>(() => 
@@ -44,13 +45,22 @@ const Game: React.FC = () => {
     setSpareNumber(null);
     setHasWon(false);
     setIsInitialized(false);
+    setError(null);
   }, [gridSize]);
 
   // Initialize the grid on the client side only
   useEffect(() => {
     if (!isInitialized) {
-      setGrid(generateInitialGrid(gridSize));
-      setIsInitialized(true);
+      generateInitialGrid(gridSize)
+        .then(newGrid => {
+          setGrid(newGrid);
+          setIsInitialized(true);
+          setError(null);
+        })
+        .catch(err => {
+          setError(err.message);
+          setIsInitialized(true);
+        });
     }
   }, [isInitialized, gridSize]);
 
@@ -82,11 +92,18 @@ const Game: React.FC = () => {
   }, [grid, spareNumber]);
 
   const resetGame = () => {
-    setGrid(generateInitialGrid(gridSize));
-    setSpareNumber(null);
-    setHasWon(false);
-    setLastPushDirection(null);
-    setMoveCount(0);
+    setError(null);
+    generateInitialGrid(gridSize)
+      .then(newGrid => {
+        setGrid(newGrid);
+        setSpareNumber(null);
+        setHasWon(false);
+        setLastPushDirection(null);
+        setMoveCount(0);
+      })
+      .catch(err => {
+        setError(err.message);
+      });
   };
 
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
@@ -303,104 +320,111 @@ const Game: React.FC = () => {
 
       <SizeSelector />
 
-      <div className="bg-white p-16 rounded-2xl shadow-xl">
-        {/* Spare number display */}
-        <div className="mb-12 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-4 min-w-[300px] justify-center">
-              <div className="text-gray-600 text-xl">Spare Number:</div>
-              <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold text-black
-                rounded-lg shadow-lg transform transition-all duration-300
-                ${spareNumber ? 'bg-blue-50' : 'bg-gray-100'}`}>
-                {spareNumber ?? '?'}
+      {error ? (
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-8 max-w-md">
+          <h3 className="text-red-600 font-semibold mb-2">Error Loading Grid</h3>
+          <p className="text-red-700">{error}</p>
+        </div>
+      ) : (
+        <div className="bg-white p-16 rounded-2xl shadow-xl">
+          {/* Spare number display */}
+          <div className="mb-12 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center gap-4 min-w-[300px] justify-center">
+                <div className="text-gray-600 text-xl">Spare Number:</div>
+                <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold text-black
+                  rounded-lg shadow-lg transform transition-all duration-300
+                  ${spareNumber ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                  {spareNumber ?? '?'}
+                </div>
+                {spareNumber === null && (
+                  <button
+                    onClick={() => setSpareNumber(getRandomNumber(1, gridSize))}
+                    className="px-6 py-3 bg-green-500 text-white text-xl rounded-lg
+                      hover:bg-green-600 transform hover:scale-105 transition-all duration-200"
+                  >
+                    Start Game
+                  </button>
+                )}
               </div>
-              {spareNumber === null && (
-                <button
-                  onClick={() => setSpareNumber(getRandomNumber(1, gridSize))}
-                  className="px-6 py-3 bg-green-500 text-white text-xl rounded-lg
-                    hover:bg-green-600 transform hover:scale-105 transition-all duration-200"
-                >
-                  Start Game
-                </button>
+              {spareNumber !== null && (
+                <div className="text-gray-600 text-lg">
+                  Moves: {moveCount}
+                </div>
               )}
             </div>
-            {spareNumber !== null && (
-              <div className="text-gray-600 text-lg">
-                Moves: {moveCount}
-              </div>
-            )}
           </div>
-        </div>
 
-        <div className="relative w-fit mx-auto">
-          {/* Grid container with padding for buttons */}
-          <div 
-            className="p-8 touch-none select-none"
-            ref={gridRef}
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-          >
-            {/* Grid */}
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}>
-              {grid.map((row, rowIndex) => (
-                row.map((value, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`transform transition-all duration-300 ${getSlideAnimation()}`}
-                  >
-                    <Cell
-                      value={value}
-                      isSelected={isDragging && (
-                        (draggedRowCol.row === rowIndex) ||
-                        (draggedRowCol.col === colIndex)
-                      )}
-                      isSwipedOver={Boolean(
-                        swipeProgress && 
-                        ((draggedRowCol.row === rowIndex && 
-                          isBetween(colIndex, swipeProgress.start, swipeProgress.current)) ||
-                         (draggedRowCol.col === colIndex && 
-                          isBetween(rowIndex, swipeProgress.start, swipeProgress.current)))
-                      )}
-                      isForbidden={Boolean(
-                        spareNumber && 
-                        draggedRowCol.col === colIndex && 
-                        spareNumber - 1 === colIndex
-                      )}
-                      onClick={() => {}}
-                    />
-                  </div>
-                ))
-              ))}
+          <div className="relative w-fit mx-auto">
+            {/* Grid container with padding for buttons */}
+            <div 
+              className="p-8 touch-none select-none"
+              ref={gridRef}
+              onTouchStart={handleDragStart}
+              onTouchMove={handleDragMove}
+              onTouchEnd={handleDragEnd}
+              onMouseDown={handleDragStart}
+              onMouseMove={handleDragMove}
+              onMouseUp={handleDragEnd}
+            >
+              {/* Grid */}
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}>
+                {grid.map((row, rowIndex) => (
+                  row.map((value, colIndex) => (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className={`transform transition-all duration-300 ${getSlideAnimation()}`}
+                    >
+                      <Cell
+                        value={value}
+                        isSelected={isDragging && (
+                          (draggedRowCol.row === rowIndex) ||
+                          (draggedRowCol.col === colIndex)
+                        )}
+                        isSwipedOver={Boolean(
+                          swipeProgress && 
+                          ((draggedRowCol.row === rowIndex && 
+                            isBetween(colIndex, swipeProgress.start, swipeProgress.current)) ||
+                           (draggedRowCol.col === colIndex && 
+                            isBetween(rowIndex, swipeProgress.start, swipeProgress.current)))
+                        )}
+                        isForbidden={Boolean(
+                          spareNumber && 
+                          draggedRowCol.col === colIndex && 
+                          spareNumber - 1 === colIndex
+                        )}
+                        onClick={() => {}}
+                      />
+                    </div>
+                  ))
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        {hasWon && (
-          <div className="mt-8 text-center">
-            <h2 className="text-2xl font-bold text-green-600 mb-2">
-              Congratulations!
-            </h2>
-            <p className="text-gray-600 mb-4">
-              You&apos;ve arranged all rows in perfect order!
-            </p>
+          {hasWon && (
+            <div className="mt-8 text-center">
+              <h2 className="text-2xl font-bold text-green-600 mb-2">
+                Congratulations!
+              </h2>
+              <p className="text-gray-600 mb-4">
+                You&apos;ve arranged all rows in perfect order!
+              </p>
+            </div>
+          )}
+
+          <div className="mt-12">
+            <button
+              onClick={resetGame}
+              className="w-full py-3 px-6 bg-blue-500 text-white text-xl font-semibold 
+                rounded-lg hover:bg-blue-600 transform hover:scale-105 
+                transition-all duration-200"
+            >
+              Reset Game
+            </button>
           </div>
-        )}
-
-        <div className="mt-12">
-          <button
-            onClick={resetGame}
-            className="w-full py-3 px-6 bg-blue-500 text-white text-xl font-semibold 
-              rounded-lg hover:bg-blue-600 transform hover:scale-105 
-              transition-all duration-200"
-          >
-            Reset Game
-          </button>
         </div>
-      </div>
+      )}
 
       {hasWon && (
         <ReactConfetti

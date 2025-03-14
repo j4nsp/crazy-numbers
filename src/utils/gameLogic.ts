@@ -3,23 +3,38 @@ export const getRandomNumber = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-// Function to generate initial grid
-export const generateInitialGrid = (gridSize: number): number[][] => {
-  const numbers = Array.from({ length: gridSize * gridSize }, (_, i) => (i % gridSize) + 1);
-  
-  // Shuffle the numbers
-  for (let i = numbers.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
-  }
-  
-  // Convert to 2D array
+// Function to convert a flat array to a 2D grid
+const convertToGrid = (flatArray: number[], size: number): number[][] => {
   const grid: number[][] = [];
-  for (let i = 0; i < gridSize; i++) {
-    grid.push(numbers.slice(i * gridSize, (i + 1) * gridSize));
+  for (let i = 0; i < size; i++) {
+    grid.push(flatArray.slice(i * size, (i + 1) * size));
+  }
+  return grid;
+};
+
+// Function to generate initial grid from predefined JSON files
+export const generateInitialGrid = async (gridSize: number): Promise<number[][]> => {
+  const fileName = gridSize === 3 ? 'three' : gridSize === 4 ? 'four' : 'five';
+  const response = await fetch(`/data/${fileName}.json`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to load predefined grid for size ${gridSize}. Please ensure /data/${fileName}.json exists.`);
   }
   
-  return grid;
+  const data = await response.json();
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(`Invalid or empty grid data in /data/${fileName}.json`);
+  }
+  
+  // Select a random grid from the predefined options
+  const randomIndex = Math.floor(Math.random() * data.length);
+  const selectedGrid = data[randomIndex];
+  
+  if (!selectedGrid.grid || !Array.isArray(selectedGrid.grid) || selectedGrid.grid.length !== gridSize * gridSize) {
+    throw new Error(`Invalid grid format in /data/${fileName}.json`);
+  }
+  
+  return convertToGrid(selectedGrid.grid, gridSize);
 };
 
 // Function to push a number into a row from left or right
