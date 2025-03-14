@@ -3,110 +3,69 @@ export const getRandomNumber = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-// Function to shuffle an array
-const shuffleArray = (array: number[]): number[] => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-};
-
 // Function to generate initial grid
-export const generateInitialGrid = (size: number = 3): number[][] => {
-  const grid: number[][] = [];
+export const generateInitialGrid = (gridSize: number): number[][] => {
+  const numbers = Array.from({ length: gridSize * gridSize }, (_, i) => (i % gridSize) + 1);
   
-  // Generate rows with random numbers 1 to size
-  for (let i = 0; i < size; i++) {
-    const row: number[] = [];
-    // Create an array of numbers from 1 to size
-    const numbers = Array.from({ length: size }, (_, i) => i + 1);
-    // Shuffle the array
-    const shuffledNumbers = shuffleArray(numbers);
-    grid.push(shuffledNumbers);
+  // Shuffle the numbers
+  for (let i = numbers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+  }
+  
+  // Convert to 2D array
+  const grid: number[][] = [];
+  for (let i = 0; i < gridSize; i++) {
+    grid.push(numbers.slice(i * gridSize, (i + 1) * gridSize));
   }
   
   return grid;
 };
 
 // Function to push a number into a row from left or right
-export const pushIntoRow = (
-  grid: number[][], 
-  rowIndex: number, 
-  pushNumber: number,
-  fromLeft: boolean
-): { newGrid: number[][], poppedNumber: number } => {
-  const newGrid = grid.map(row => [...row]);
-  const row = newGrid[rowIndex];
-  const poppedNumber = fromLeft ? row.pop()! : row.shift()!;
+export const pushIntoRow = (grid: number[][], rowIndex: number, newNumber: number, fromLeft: boolean) => {
+  const newGrid = grid.map(r => [...r]);
+  const poppedNumber = fromLeft ? newGrid[rowIndex].pop()! : newGrid[rowIndex].shift()!;
   
   if (fromLeft) {
-    row.unshift(pushNumber);
+    newGrid[rowIndex].unshift(newNumber);
   } else {
-    row.push(pushNumber);
+    newGrid[rowIndex].push(newNumber);
   }
   
   return { newGrid, poppedNumber };
 };
 
 // Function to push a number into a column from top or bottom
-export const pushIntoColumn = (
-  grid: number[][], 
-  colIndex: number, 
-  pushNumber: number,
-  fromTop: boolean
-): { newGrid: number[][], poppedNumber: number } => {
-  const newGrid = grid.map(row => [...row]);
-  const column = getColumn(grid, colIndex);
+export const pushIntoColumn = (grid: number[][], colIndex: number, newNumber: number, fromTop: boolean) => {
+  const newGrid = grid.map(r => [...r]);
+  const column = newGrid.map(r => r[colIndex]);
   const poppedNumber = fromTop ? column.pop()! : column.shift()!;
   
   if (fromTop) {
-    column.unshift(pushNumber);
+    column.unshift(newNumber);
   } else {
-    column.push(pushNumber);
+    column.push(newNumber);
   }
   
-  // Update the grid with the new column
-  for (let i = 0; i < grid.length; i++) {
-    newGrid[i][colIndex] = column[i];
-  }
+  // Update the grid with the new column values
+  column.forEach((value, rowIndex) => {
+    newGrid[rowIndex][colIndex] = value;
+  });
   
   return { newGrid, poppedNumber };
 };
 
-// Function to check if a row is valid (contains 1 to size in order)
-export const isRowValid = (row: number[]): boolean => {
-  const size = row.length;
-  return row.every((num, index) => num === index + 1);
-};
-
 // Function to check if the game is won
 export const checkWinCondition = (grid: number[][]): boolean => {
-  return grid.every(row => isRowValid(row));
-};
-
-// Function to get a column from the grid
-export const getColumn = (grid: number[][], colIndex: number): number[] => {
-  return grid.map(row => row[colIndex]);
-};
-
-// Function to set a column in the grid
-export const setColumn = (
-  grid: number[][], 
-  colIndex: number, 
-  newColumn: number[]
-): number[][] => {
-  return grid.map((row, i) => {
-    const newRow = [...row];
-    newRow[colIndex] = newColumn[i];
-    return newRow;
+  return grid.every(row => {
+    for (let i = 1; i < row.length; i++) {
+      if (row[i] <= row[i - 1]) {
+        return false;
+      }
+    }
+    return true;
   });
-};
-
-export type Position = {
-  row: number;
-  col: number;
 };
 
 export type Direction = 'left' | 'right' | 'top' | 'bottom'; 

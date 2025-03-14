@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactConfetti from 'react-confetti';
 import Cell from './Cell';
 import { 
@@ -15,17 +15,6 @@ import { playBlopSound, playPushSound, playErrorSound } from '../utils/sound';
 
 type GridSize = 3 | 4 | 5;
 
-const getColorForNumber = (num: number) => {
-  switch (num) {
-    case 1: return 'bg-blue-500 text-white';
-    case 2: return 'bg-green-500 text-white';
-    case 3: return 'bg-purple-500 text-white';
-    case 4: return 'bg-pink-500 text-white';
-    case 5: return 'bg-yellow-500 text-black';
-    default: return 'bg-gray-200';
-  }
-};
-
 const Game: React.FC = () => {
   const [gridSize, setGridSize] = useState<GridSize>(3);
   
@@ -35,6 +24,7 @@ const Game: React.FC = () => {
   );
   const [spareNumber, setSpareNumber] = useState<number | null>(null);
   const [hasWon, setHasWon] = useState(false);
+  const [moveCount, setMoveCount] = useState(0);
   const [lastPushDirection, setLastPushDirection] = useState<Direction | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -46,9 +36,6 @@ const Game: React.FC = () => {
   });
   const [swipeProgress, setSwipeProgress] = useState<{ start: number; current: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-
-  // Minimum swipe distance in pixels
-  const minSwipeDistance = 50;
 
   // Initialize empty grid based on size
   useEffect(() => {
@@ -71,7 +58,7 @@ const Game: React.FC = () => {
     setHasWon(checkWinCondition(grid));
   }, [grid]);
 
-  const handlePush = (index: number, direction: Direction) => {
+  const handlePush = useCallback((index: number, direction: Direction) => {
     if (spareNumber === null) {
       return;
     }
@@ -86,18 +73,20 @@ const Game: React.FC = () => {
 
     setGrid(result.newGrid);
     setSpareNumber(result.poppedNumber);
+    setMoveCount(prev => prev + 1);
 
     // Reset animation direction after animation completes
     setTimeout(() => {
       setLastPushDirection(null);
     }, 300);
-  };
+  }, [grid, spareNumber]);
 
   const resetGame = () => {
     setGrid(generateInitialGrid(gridSize));
     setSpareNumber(null);
     setHasWon(false);
     setLastPushDirection(null);
+    setMoveCount(0);
   };
 
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
@@ -172,7 +161,7 @@ const Game: React.FC = () => {
     }
   };
 
-  const handleDragEnd = (e?: React.MouseEvent | React.TouchEvent) => {
+  const handleDragEnd = useCallback(() => {
     if (!isDragging || !touchStart || !touchEnd || !swipeProgress || !spareNumber) {
       // Reset all drag states if we don't have complete swipe data
       setTouchStart(null);
@@ -233,13 +222,12 @@ const Game: React.FC = () => {
     setIsDragging(false);
     setDraggedRowCol({ row: null, col: null });
     setSwipeProgress(null);
-  };
+  }, [isDragging, touchStart, touchEnd, swipeProgress, spareNumber, draggedRowCol, gridSize, handlePush]);
 
   // Add global mouse up listener
   useEffect(() => {
     const handleGlobalMouseUp = (e: MouseEvent) => {
       if (isDragging) {
-        // Update the final touch position
         setTouchEnd({ x: e.clientX, y: e.clientY });
         handleDragEnd();
       }
@@ -249,7 +237,7 @@ const Game: React.FC = () => {
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isDragging, touchStart, swipeProgress, draggedRowCol.row, draggedRowCol.col]);
+  }, [isDragging, touchStart, swipeProgress, draggedRowCol.row, draggedRowCol.col, handleDragEnd]);
 
   const getTargetedIndex = (x: number, y: number, isHorizontal: boolean): number | null => {
     if (!gridRef.current) return null;
@@ -267,7 +255,7 @@ const Game: React.FC = () => {
     return (index >= 0 && index < gridSize) ? index : null;
   };
 
-  const getSlideAnimation = (rowIndex: number, colIndex: number) => {
+  const getSlideAnimation = () => {
     if (!lastPushDirection) return '';
     
     const slideClasses = {
@@ -318,21 +306,28 @@ const Game: React.FC = () => {
       <div className="bg-white p-16 rounded-2xl shadow-xl">
         {/* Spare number display */}
         <div className="mb-12 flex items-center justify-center">
-          <div className="flex items-center gap-4 min-w-[300px] justify-center">
-            <div className="text-gray-600 text-xl">Spare Number:</div>
-            <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold text-black
-              rounded-lg shadow-lg transform transition-all duration-300
-              ${spareNumber ? 'bg-blue-50' : 'bg-gray-100'}`}>
-              {spareNumber ?? '?'}
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center gap-4 min-w-[300px] justify-center">
+              <div className="text-gray-600 text-xl">Spare Number:</div>
+              <div className={`w-16 h-16 flex items-center justify-center text-2xl font-bold text-black
+                rounded-lg shadow-lg transform transition-all duration-300
+                ${spareNumber ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                {spareNumber ?? '?'}
+              </div>
+              {spareNumber === null && (
+                <button
+                  onClick={() => setSpareNumber(getRandomNumber(1, gridSize))}
+                  className="px-6 py-3 bg-green-500 text-white text-xl rounded-lg
+                    hover:bg-green-600 transform hover:scale-105 transition-all duration-200"
+                >
+                  Start Game
+                </button>
+              )}
             </div>
-            {spareNumber === null && (
-              <button
-                onClick={() => setSpareNumber(getRandomNumber(1, gridSize))}
-                className="px-6 py-3 bg-green-500 text-white text-xl rounded-lg
-                  hover:bg-green-600 transform hover:scale-105 transition-all duration-200"
-              >
-                Start Game
-              </button>
+            {spareNumber !== null && (
+              <div className="text-gray-600 text-lg">
+                Moves: {moveCount}
+              </div>
             )}
           </div>
         </div>
@@ -355,7 +350,7 @@ const Game: React.FC = () => {
                 row.map((value, colIndex) => (
                   <div
                     key={`${rowIndex}-${colIndex}`}
-                    className={`transform transition-all duration-300 ${getSlideAnimation(rowIndex, colIndex)}`}
+                    className={`transform transition-all duration-300 ${getSlideAnimation()}`}
                   >
                     <Cell
                       value={value}
@@ -390,7 +385,7 @@ const Game: React.FC = () => {
               Congratulations!
             </h2>
             <p className="text-gray-600 mb-4">
-              You've arranged all rows in perfect order!
+              You&apos;ve arranged all rows in perfect order!
             </p>
           </div>
         )}
